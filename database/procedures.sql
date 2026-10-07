@@ -1,0 +1,18 @@
+-- =====================================================
+-- Archivo: procedures.sql
+-- Modulo: Base de datos
+-- Responsable: [nombre del integrante]
+-- Descripcion: Procedimientos almacenados obligatorios
+--              segun requisito tecnico del curso.
+--
+-- Estandar: cada procedimiento inicia con sp_ seguido
+-- del nombre de la accion en minuscula (ej: sp_crear_solicitud)
+-- =====================================================
+
+-- TODO: DELIMITER //
+-- TODO: CREATE PROCEDURE sp_registrar_usuario(...)
+-- TODO: CREATE PROCEDURE sp_generar_proforma(...)
+-- TODO: CREATE PROCEDURE sp_crear_solicitud(...)
+-- TODO: CREATE PROCEDURE sp_responder_solicitud(...)
+-- TODO: CREATE PROCEDURE sp_calcular_calificacion_promedio(...)
+-- TODO: DELIMITER ;

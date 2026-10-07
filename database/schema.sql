@@ -1,0 +1,24 @@
+-- =====================================================
+-- Archivo: schema.sql
+-- Modulo: Base de datos
+-- Responsable: [nombre del integrante]
+-- Descripcion: Estructura de tablas segun el diagrama ER
+--              del anteproyecto (12 entidades + Empresa_Zona).
+-- =====================================================
+
+-- TODO: CREATE DATABASE plataforma_mudanzas;
+-- TODO: USE plataforma_mudanzas;
+
+-- TODO: CREATE TABLE roles (...)
+-- TODO: CREATE TABLE usuarios (...)
+-- TODO: CREATE TABLE login_auditoria (...)
+-- TODO: CREATE TABLE token_recuperacion (...)
+-- TODO: CREATE TABLE empresas (...)
+-- TODO: CREATE TABLE flota (...)
+-- TODO: CREATE TABLE zonas_cobertura (...)
+-- TODO: CREATE TABLE empresa_zona (...)        -- tabla intermedia N:M
+-- TODO: CREATE TABLE tarifas (...)
+-- TODO: CREATE TABLE proformas (...)
+-- TODO: CREATE TABLE solicitudes (...)
+-- TODO: CREATE TABLE resenas (...)
+-- TODO: CREATE TABLE notificaciones (...)
