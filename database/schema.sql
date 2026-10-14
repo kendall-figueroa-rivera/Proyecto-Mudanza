@@ -15,9 +15,9 @@ GO
 
 CREATE TABLE roles (
     id_rol      INT IDENTITY(1,1) PRIMARY KEY,
-    nombre      VARCHAR(50) NOT NULL UNIQUE
+    nombre      VARCHAR(50) NOT NULL UNIQUE,
+    descripcion VARCHAR(255) NULL
 );
-GO
 
 
 CREATE TABLE usuarios (
@@ -193,19 +193,21 @@ GO
 
 CREATE TABLE resenas (
     id_resena     INT IDENTITY(1,1) PRIMARY KEY,
-    id_solicitud  INT NOT NULL UNIQUE,               -- una reseña por solicitud
+    id_solicitud  INT NOT NULL UNIQUE,                -- una reseña por solicitud
     id_cliente    INT NOT NULL,
     id_empresa    INT NOT NULL,
     calificacion  TINYINT NOT NULL,
     comentario    VARCHAR(500) NULL,
     fecha         DATETIME NOT NULL DEFAULT GETDATE(),
+    estado        VARCHAR(15) NOT NULL DEFAULT 'visible',
     CONSTRAINT fk_resenas_solicitud
         FOREIGN KEY (id_solicitud) REFERENCES solicitudes(id_solicitud),
     CONSTRAINT fk_resenas_cliente
         FOREIGN KEY (id_cliente) REFERENCES usuarios(id_usuario),
     CONSTRAINT fk_resenas_empresa
         FOREIGN KEY (id_empresa) REFERENCES empresas(id_empresa),
-    CONSTRAINT ck_resenas_calificacion CHECK (calificacion BETWEEN 1 AND 5)
+    CONSTRAINT ck_resenas_calificacion CHECK (calificacion BETWEEN 1 AND 5),
+    CONSTRAINT ck_resenas_estado CHECK (estado IN ('visible', 'oculta'))
 );
 GO
 
