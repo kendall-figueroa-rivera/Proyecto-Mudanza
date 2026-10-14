@@ -69,12 +69,17 @@ CREATE TABLE empresas (
     telefono         VARCHAR(20) NULL,
     direccion        VARCHAR(255) NULL,
     descripcion      VARCHAR(500) NULL,
-    estado           VARCHAR(15) NOT NULL DEFAULT 'activa',
-    fecha_registro   DATETIME NOT NULL DEFAULT GETDATE(),
+    estado            VARCHAR(15) NOT NULL DEFAULT 'pendiente',
+    fecha_registro    DATETIME NOT NULL DEFAULT GETDATE(),
+    id_admin_revision INT NULL,                       -- admin que aprobó o rechazó
+    fecha_revision    DATETIME NULL,
+    motivo_rechazo    VARCHAR(255) NULL,
     CONSTRAINT fk_empresas_usuarios
         FOREIGN KEY (id_usuario) REFERENCES usuarios(id_usuario),
+    CONSTRAINT fk_empresas_admin
+        FOREIGN KEY (id_admin_revision) REFERENCES usuarios(id_usuario),
     CONSTRAINT ck_empresas_estado
-        CHECK (estado IN ('activa', 'inactiva', 'suspendida'))
+        CHECK (estado IN ('pendiente', 'activa', 'rechazada', 'inactiva', 'suspendida'))
 );
 GO
 
