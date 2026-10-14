@@ -21,8 +21,9 @@ class AuthController
     /**
      * Registra un usuario nuevo (cliente o empresa) usando sp_registrar_usuario.
      * Si el tipo de cuenta es "empresa", crea tambien el registro base en la
-     * tabla empresas (el resto del perfil de empresa, como zonas de cobertura
-     * y flota, se completa despues desde el modulo de empresa).
+     * tabla empresas, con estado "pendiente" hasta que el administrador la
+     * apruebe (el resto del perfil, como zonas de cobertura y flota, se
+     * completa despues desde el modulo de empresa).
      */
     public function registrar(array $datos): array
     {
@@ -57,9 +58,10 @@ class AuthController
             $idUsuario = (int) $fila['id_usuario'];
 
             if ($datos['tipo_cuenta'] === 'empresa') {
+                // Estado "pendiente": requiere aprobacion del administrador (RF-21)
                 $stmtEmpresa = $this->pdo->prepare(
-                    "INSERT INTO empresas (id_usuario, nombre_comercial, identificacion)
-                     VALUES (:id_usuario, :nombre_comercial, :identificacion)"
+                    "INSERT INTO empresas (id_usuario, nombre_comercial, identificacion, estado)
+                     VALUES (:id_usuario, :nombre_comercial, :identificacion, 'pendiente')"
                 );
                 $stmtEmpresa->execute([
                     ':id_usuario'       => $idUsuario,
