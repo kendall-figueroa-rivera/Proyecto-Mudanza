@@ -57,6 +57,11 @@ BEGIN
         THROW 50011, N'El cliente no existe o está inactivo.', 1;
     END
 
+    IF NOT EXISTS (SELECT 1 FROM empresas WHERE id_empresa = @id_empresa AND estado = 'activa')
+    BEGIN
+        THROW 50015, N'La empresa no está activa o aún no ha sido aprobada.', 1;
+    END
+
     IF NOT EXISTS (SELECT 1 FROM empresa_zona
                    WHERE id_empresa = @id_empresa AND id_zona = @id_zona_origen)
     BEGIN
@@ -226,5 +231,70 @@ BEGIN
            COUNT(*) AS total_resenas
     FROM resenas
     WHERE id_empresa = @id_empresa;
+END
+GO
+
+
+CREATE OR ALTER PROCEDURE sp_revisar_empresa
+    @id_empresa INT,
+    @id_admin   INT,
+    @decision   VARCHAR(10),          -- 'activa' o 'rechazada'
+    @motivo     VARCHAR(255) = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+
+    DECLARE @id_usuario_empresa INT;
+
+    IF @decision NOT IN ('activa', 'rechazada')
+    BEGIN
+        THROW 50050, N'La decisión debe ser activa o rechazada.', 1;
+    END
+
+    IF NOT EXISTS (SELECT 1 FROM usuarios u
+                   INNER JOIN roles r ON r.id_rol = u.id_rol
+                   WHERE u.id_usuario = @id_admin
+                     AND r.nombre = 'administrador' AND u.activo = 1)
+    BEGIN
+        THROW 50051, N'Solo un administrador activo puede revisar empresas.', 1;
+    END
+
+    IF @decision = 'rechazada' AND (@motivo IS NULL OR LTRIM(RTRIM(@motivo)) = '')
+    BEGIN
+        THROW 50052, N'Debe indicar el motivo del rechazo.', 1;
+    END
+
+    SELECT @id_usuario_empresa = id_usuario
+    FROM empresas
+    WHERE id_empresa = @id_empresa AND estado = 'pendiente';
+
+    IF @id_usuario_empresa IS NULL
+    BEGIN
+        THROW 50053, N'La empresa no existe o ya fue revisada.', 1;
+    END
+
+    BEGIN TRY
+        BEGIN TRANSACTION;
+
+        UPDATE empresas
+        SET estado = @decision,
+            id_admin_revision = @id_admin,
+            fecha_revision = GETDATE(),
+            motivo_rechazo = CASE WHEN @decision = 'rechazada' THEN @motivo ELSE NULL END
+        WHERE id_empresa = @id_empresa;
+
+        INSERT INTO notificaciones (id_usuario, mensaje)
+        VALUES (@id_usuario_empresa,
+                CASE WHEN @decision = 'activa'
+                     THEN N'Tu empresa fue aprobada. Ya puedes recibir solicitudes.'
+                     ELSE CONCAT(N'Tu empresa fue rechazada. Motivo: ', @motivo) END);
+
+        COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        THROW;
+    END CATCH
 END
 GO
