@@ -15,7 +15,8 @@ $(function () {
     }
 
     // Muestra u oculta los campos extra de empresa segun el tipo de cuenta elegido
-    $('#tipo_cuenta').on('change', function () {
+    // (tipo_cuenta ahora se elige con botones tipo tarjeta, no con un <select>)
+    $('.radio-tipo-cuenta').on('change', function () {
         if ($(this).val() === 'empresa') {
             $('#camposEmpresa').slideDown();
             $('#camposEmpresa input').prop('required', true);
