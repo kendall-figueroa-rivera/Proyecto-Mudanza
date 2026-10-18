@@ -12,7 +12,7 @@ GO
 CREATE OR ALTER PROCEDURE sp_registrar_usuario
     @id_rol        INT,
     @nombre        VARCHAR(100),
-    @correo        VARCHAR(150),
+    @correo        VARCHAR(150), 
     @password_hash VARCHAR(255),
     @telefono      VARCHAR(20) = NULL
 AS
