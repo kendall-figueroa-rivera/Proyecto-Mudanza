@@ -21,7 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $destino = match ($resultado['rol']) {
             'empresa'       => '../empresa/dashboard.php',
             'administrador' => '../admin/dashboard.php',
-            default         => '../cliente/dashboard.php',
+            default         => '../publico/home.php',
         };
         header("Location: $destino");
         exit;
