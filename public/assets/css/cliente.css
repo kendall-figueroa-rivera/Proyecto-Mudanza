@@ -1,0 +1,297 @@
+/*
+ * Archivo: cliente.css
+ * Modulo: Cliente
+ * Responsable: [nombre del integrante]
+ * Descripcion: Estilos del modulo cliente y de las vistas publicas de
+ *              directorio, perfil de empresa y contacto. Usa Bootstrap como
+ *              base y la misma paleta y tipografias del home (MudaConecta).
+ */
+
+:root {
+  --ink: #1B2A41;
+  --paper: #F1EEE4;
+  --paper-2: #E7E1D2;
+  --mustard: #C98A2B;
+  --slate: #3F6774;
+  --line: #D8D0BC;
+  --muted: #6B6A5F;
+  --ok: #2F6B4F;
+  --alerta: #9A3B2E;
+
+  --bs-body-bg: var(--paper);
+  --bs-body-color: var(--ink);
+  --bs-body-font-family: 'Inter', system-ui, sans-serif;
+  --bs-border-color: var(--line);
+  --bs-link-color-rgb: 27, 42, 65;
+  --bs-border-radius: 2px;
+  --bs-border-radius-sm: 2px;
+  --bs-border-radius-lg: 4px;
+}
+
+body { background: var(--paper); line-height: 1.55; }
+
+/* ---------- Tipografia ---------- */
+h1, h2, .titulo {
+  font-family: 'Big Shoulders Display', 'Arial Narrow', sans-serif;
+  font-weight: 900;
+  text-transform: uppercase;
+  line-height: .95;
+  letter-spacing: .01em;
+}
+h1 { font-size: clamp(2.2rem, 5vw, 3.4rem); margin-bottom: .5rem; }
+h2 { font-size: clamp(1.5rem, 3vw, 2rem); margin-bottom: 1rem; }
+h3 { font-size: 1.1rem; font-weight: 700; }
+.intro { color: var(--muted); max-width: 56ch; margin-bottom: 2rem; }
+.texto-suave { color: var(--muted); }
+a { text-decoration-color: var(--mustard); text-underline-offset: 3px; }
+
+/* ---------- Barra de navegacion ---------- */
+.barra {
+  border-bottom: 1px solid var(--line);
+  padding: 18px 0;
+  margin-bottom: 40px;
+}
+.barra .marca {
+  font-family: 'Big Shoulders Display', sans-serif;
+  font-weight: 900;
+  font-size: 1.5rem;
+  color: var(--ink);
+  text-decoration: none;
+}
+.barra .marca span { color: var(--mustard); }
+.barra .nav-link {
+  color: var(--ink);
+  font-weight: 600;
+  font-size: .95rem;
+  padding: 6px 12px;
+  border-bottom: 2px solid transparent;
+}
+.barra .nav-link:hover { border-bottom-color: var(--line); }
+.barra .nav-link.activo { border-bottom-color: var(--mustard); }
+.barra .usuario { color: var(--muted); font-size: .9rem; }
+.barra .navbar-toggler { border-color: var(--line); }
+
+/* ---------- Botones ---------- */
+.btn { font-weight: 700; border-width: 1.5px; padding: 10px 20px; }
+.btn-sm { padding: 5px 12px; }
+.btn-tinta { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+.btn-tinta:hover, .btn-tinta:focus { background: #2A3D5A; border-color: #2A3D5A; color: var(--paper); }
+.btn-mostaza { background: var(--mustard); border-color: var(--mustard); color: var(--ink); }
+.btn-mostaza:hover, .btn-mostaza:focus { background: #B57A22; border-color: #B57A22; color: var(--ink); }
+.btn-contorno { background: transparent; border-color: var(--ink); color: var(--ink); }
+.btn-contorno:hover, .btn-contorno:focus { background: var(--ink); color: var(--paper); }
+.btn-peligro { background: transparent; border-color: var(--alerta); color: var(--alerta); }
+.btn-peligro:hover, .btn-peligro:focus { background: var(--alerta); color: #fff; }
+
+:focus-visible { outline: 3px solid var(--mustard); outline-offset: 2px; }
+.form-control:focus, .form-select:focus {
+  border-color: var(--slate);
+  box-shadow: 0 0 0 .2rem rgba(63, 103, 116, .25);
+}
+.form-control, .form-select { background-color: #FBFAF6; }
+.form-label { font-weight: 600; font-size: .92rem; }
+
+/* ---------- Paneles ---------- */
+.panel {
+  background: #FBFAF6;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 24px;
+}
+.panel-oscuro {
+  background: var(--ink);
+  color: var(--paper);
+  border-radius: 4px;
+  padding: 24px;
+}
+.panel-oscuro .form-label { color: #B7C2CE; }
+
+/* ---------- Boleto de ruta (elemento distintivo del modulo) ---------- */
+.ruta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  font-weight: 700;
+}
+.ruta .punto {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  border: 2px solid var(--ink);
+  flex: 0 0 auto;
+}
+.ruta .punto.fin { background: var(--mustard); border-color: var(--mustard); }
+.ruta .tramo {
+  flex: 1 1 40px;
+  min-width: 30px;
+  height: 2px;
+  background-image: linear-gradient(to right, var(--muted) 50%, transparent 0%);
+  background-size: 10px 2px;
+  background-repeat: repeat-x;
+}
+.ruta .km { color: var(--muted); font-size: .8rem; font-weight: 600; white-space: nowrap; }
+
+.boleto {
+  background: #FBFAF6;
+  border: 1px solid var(--line);
+  border-left: 6px solid var(--slate);
+  border-radius: 4px;
+  padding: 20px 22px;
+  margin-bottom: 14px;
+}
+.boleto.vigente, .boleto.pendiente { border-left-color: var(--mustard); }
+.boleto.aceptada, .boleto.completada { border-left-color: var(--ok); }
+.boleto.vencida, .boleto.rechazada, .boleto.cancelada { border-left-color: var(--line); }
+.boleto.vencida .monto, .boleto.cancelada .monto { color: var(--muted); }
+.boleto .empresa { font-weight: 700; font-size: 1.05rem; }
+.boleto .meta { color: var(--muted); font-size: .88rem; }
+.monto {
+  font-family: 'Big Shoulders Display', sans-serif;
+  font-weight: 900;
+  font-size: 1.8rem;
+  line-height: 1;
+}
+
+/* Proforma generada: el monto es el protagonista */
+.proforma-detalle .monto { font-size: clamp(2.6rem, 7vw, 4rem); }
+.desglose { border-top: 1px dashed var(--line); margin-top: 18px; padding-top: 14px; }
+.desglose dt { font-weight: 600; color: var(--muted); font-size: .88rem; }
+.desglose dd { margin-bottom: 8px; }
+
+/* ---------- Estados ---------- */
+.estado {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 2px;
+  font-size: .8rem;
+  font-weight: 700;
+  border: 1px solid currentColor;
+}
+.estado.vigente, .estado.pendiente { color: #8A5D16; background: #F6E9D2; }
+.estado.aceptada, .estado.completada { color: var(--ok); background: #DDEBE2; }
+.estado.rechazada { color: var(--alerta); background: #F2DEDA; }
+.estado.vencida, .estado.cancelada { color: var(--muted); background: var(--paper-2); }
+
+/* ---------- Tarjetas de empresa ---------- */
+.empresa-ficha {
+  background: #FBFAF6;
+  border: 1px solid var(--line);
+  border-top: 3px solid var(--slate);
+  border-radius: 2px;
+  padding: 20px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+.empresa-ficha h3 { margin-bottom: 4px; }
+.empresa-ficha h3 a { color: var(--ink); text-decoration: none; }
+.empresa-ficha h3 a:hover { text-decoration: underline; }
+.empresa-ficha .zonas { color: var(--muted); font-size: .85rem; margin-bottom: 10px; }
+.empresa-ficha p { font-size: .92rem; flex: 1; }
+.estrellas { color: var(--mustard); font-weight: 700; font-size: .92rem; letter-spacing: .05em; }
+.estrellas .vacias { color: var(--line); }
+
+/* ---------- Contadores del panel ---------- */
+.contador {
+  display: block;
+  border-top: 3px solid var(--ink);
+  padding-top: 10px;
+  color: var(--ink);
+  text-decoration: none;
+}
+.contador .numero {
+  font-family: 'Big Shoulders Display', sans-serif;
+  font-weight: 900;
+  font-size: 3rem;
+  line-height: 1;
+}
+.contador .etiqueta { color: var(--muted); font-weight: 600; }
+.contador:hover .etiqueta { color: var(--ink); }
+
+/* ---------- Notificaciones ---------- */
+.notificaciones { list-style: none; padding: 0; margin: 0; }
+.notificaciones li { padding: 12px 0; border-bottom: 1px solid var(--line); font-size: .93rem; }
+.notificaciones li:last-child { border-bottom: none; }
+.notificaciones li.nueva { font-weight: 600; }
+.notificaciones li.nueva::before {
+  content: '';
+  display: inline-block;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--mustard);
+  margin-right: 8px;
+}
+.notificaciones time { display: block; color: var(--muted); font-size: .8rem; font-weight: 400; }
+
+/* ---------- Calificacion con estrellas ---------- */
+.selector-estrellas {
+  display: inline-flex;
+  flex-direction: row-reverse;
+  gap: 4px;
+}
+.selector-estrellas input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.selector-estrellas label {
+  font-size: 2.4rem;
+  line-height: 1;
+  color: var(--line);
+  cursor: pointer;
+  transition: color .12s, transform .12s;
+}
+.selector-estrellas input:checked ~ label,
+.selector-estrellas label:hover,
+.selector-estrellas label:hover ~ label { color: var(--mustard); }
+.selector-estrellas input:focus-visible + label { outline: 3px solid var(--slate); outline-offset: 2px; }
+.selector-estrellas.is-invalid label { color: #E3B8B0; }
+.texto-estrellas { color: var(--muted); font-weight: 600; min-height: 1.5em; }
+
+/* ---------- Tablas ---------- */
+.tabla-tarifas { --bs-table-bg: transparent; font-size: .93rem; }
+.tabla-tarifas th { color: var(--muted); font-weight: 600; font-size: .85rem; }
+.tabla-scroll { overflow-x: auto; }
+
+/* ---------- Resenas ---------- */
+.resena { border-bottom: 1px solid var(--line); padding: 16px 0; }
+.resena:last-child { border-bottom: none; }
+.resena .autor { font-weight: 600; }
+
+/* ---------- Vacios y avisos ---------- */
+.vacio {
+  border: 1px dashed var(--line);
+  border-radius: 4px;
+  padding: 32px;
+  text-align: center;
+  color: var(--muted);
+}
+.vacio p { margin-bottom: 14px; }
+.alert { border-radius: 2px; }
+
+/* ---------- Filtros por estado ---------- */
+.filtros { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 24px; }
+.filtros a {
+  padding: 6px 14px;
+  border: 1.5px solid var(--line);
+  border-radius: 2px;
+  color: var(--ink);
+  font-weight: 600;
+  font-size: .9rem;
+  text-decoration: none;
+}
+.filtros a.activo { border-color: var(--ink); background: var(--ink); color: var(--paper); }
+
+/* ---------- Pie ---------- */
+.pie {
+  border-top: 1px solid var(--line);
+  margin-top: 64px;
+  padding: 24px 0;
+  color: var(--muted);
+  font-size: .85rem;
+}
+.pie a { color: var(--muted); }
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}
+@media (max-width: 575px) {
+  .boleto { padding: 16px; }
+  .monto { font-size: 1.5rem; }
+}
