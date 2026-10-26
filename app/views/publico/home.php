@@ -166,6 +166,9 @@ $empresasDestacadas = $stmt->fetchAll(PDO::FETCH_ASSOC);
   <div class="brand">Muda<span>Conecta</span></div>
   <nav class="nav-actions">
     <?php if ($haySesion): ?>
+      <?php if ($rolActual === 'empresa'): ?>
+        <a href="../empresa/perfil.php">Mi empresa</a>
+      <?php endif; ?>
       <a href="<?= htmlspecialchars($panelPorRol[$rolActual] ?? '../cliente/dashboard.php') ?>">Mi panel</a>
       <a href="../auth/logout.php" class="btn btn-ghost">Cerrar sesión</a>
     <?php else: ?>
@@ -298,7 +301,12 @@ $empresasDestacadas = $stmt->fetchAll(PDO::FETCH_ASSOC);
         <h2>¿Tenés una empresa de transporte?</h2>
         <p>Registrá tu flota, definí tus tarifas por ruta y empezá a recibir solicitudes de clientes reales.</p>
       </div>
-      <a href="../auth/registro.php" class="btn btn-accent">Registrar mi empresa</a>
+      <div style="display:flex; gap:12px; flex-wrap:wrap;">
+        <a href="<?= $rolActual === 'empresa' ? '../empresa/perfil.php' : '../auth/login.php' ?>" class="btn btn-solid">Acceder a mi empresa</a>
+        <?php if (!$haySesion): ?>
+          <a href="../auth/registro.php" class="btn btn-accent">Registrar mi empresa</a>
+        <?php endif; ?>
+      </div>
     </div>
   </div>
 </section>
