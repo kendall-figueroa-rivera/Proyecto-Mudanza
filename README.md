@@ -13,7 +13,7 @@
 
 - **Frontend:** HTML5, CSS3, Bootstrap, JavaScript, jQuery
 - **Backend:** PHP (arquitectura MVC)
-- **Base de datos:** MySQL (con procedimientos almacenados)
+- **Base de datos:** Microsoft SQL Server (con procedimientos almacenados)
 
 ## Estructura del proyecto
 
@@ -36,12 +36,23 @@ proyecto-mudanzas/
 │       ├── js/             → Scripts (enlazados, nunca inline)
 │       └── img/
 ├── config/
-│   └── database.php       → Conexión centralizada a MySQL
+│   └── database.php       → Conexión centralizada a SQL Server
 ├── database/
 │   ├── schema.sql          → Creación de tablas
 │   └── procedures.sql     → Procedimientos almacenados
 └── docs/                   → Documento IEEE, diagramas ER y relacional
 ```
+
+## Conexion local a SQL Server desde PHP
+
+La aplicacion se conecta con PDO_SQLSRV. Para la instancia local `SANTIDELL`:
+
+1. Instale el ODBC Driver 18 para SQL Server y el controlador oficial de Microsoft `PDO_SQLSRV` que coincida con la version de PHP de XAMPP. Por ejemplo, para PHP 8.2 Thread Safe x64, use `php_pdo_sqlsrv_82_ts_x64.dll` del [paquete oficial de Microsoft](https://github.com/microsoft/msphpsql/releases).
+2. Copie la DLL en `C:\xampp\php\ext` y agregue `extension=php_pdo_sqlsrv_82_ts_x64.dll` a `C:\xampp\php\php.ini`. Reinicie Apache desde XAMPP.
+3. Copie `.env.example` como `.env` en la raiz. Los valores de ejemplo ya corresponden a `SANTIDELL` y `plataforma_mudanzas`. Sin `DB_USER` y `DB_PASSWORD`, se usa autenticacion de Windows; Apache debe ejecutarse con una cuenta de Windows autorizada en SQL Server.
+4. Confirme que PDO_SQLSRV se cargo con `C:\xampp\php\php.exe -m` y abra la aplicacion por Apache.
+
+Si se configura autenticacion SQL, indique tanto `DB_USER` como `DB_PASSWORD` en `.env`. No comparta ni suba ese archivo. Los scripts de creacion estan en `database/schema.sql` y `database/procedures.sql`.
 
 ## Flujo de trabajo en Git
 
