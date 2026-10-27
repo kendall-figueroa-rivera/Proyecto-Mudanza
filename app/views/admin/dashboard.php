@@ -48,18 +48,22 @@ $paginaActual = 'dashboard';
 
   <div class="row g-4">
     <div class="col-md-6">
-      <section class="panel h-100">
+      <section class="panel h-100 d-flex flex-column">
         <h2>Empresas</h2>
         <p>Revisa las empresas registradas y gestiona su aprobación o suspensión.</p>
-        <a class="btn btn-mostaza" href="empresas.php">Administrar empresas</a>
+        <a class="btn btn-mostaza mt-auto align-self-start" href="empresas.php">
+          Administrar empresas
+        </a>
       </section>
     </div>
 
     <div class="col-md-6">
-      <section class="panel h-100">
+      <section class="panel h-100 d-flex flex-column">
         <h2>Catálogo de zonas</h2>
         <p>Mantén las zonas geográficas con su provincia y cantón.</p>
-        <a class="btn btn-mostaza" href="zonas.php">Administrar zonas</a>
+        <a class="btn btn-mostaza mt-auto align-self-start" href="zonas.php">
+          Administrar zonas
+        </a>
       </section>
     </div>
   </div>
