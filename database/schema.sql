@@ -92,6 +92,7 @@ CREATE TABLE flota (
     capacidad_kg   DECIMAL(10,2) NOT NULL,
     estado         VARCHAR(15) NOT NULL DEFAULT 'disponible',
     activo         BIT NOT NULL DEFAULT 1,           -- 0 = eliminado logicamente
+    id_tarifa      INT NULL,                         -- ruta que realiza el vehiculo
     CONSTRAINT fk_flota_empresas
         FOREIGN KEY (id_empresa) REFERENCES empresas(id_empresa),
     CONSTRAINT ck_flota_capacidad CHECK (capacidad_kg > 0),
@@ -144,6 +145,10 @@ CREATE TABLE tarifas (
         CHECK (precio_base >= 0 AND precio_por_km >= 0),
     CONSTRAINT ck_tarifas_distancia CHECK (distancia_km > 0)
 );
+GO
+
+ALTER TABLE flota ADD CONSTRAINT fk_flota_tarifas
+    FOREIGN KEY (id_tarifa) REFERENCES tarifas(id_tarifa);
 GO
 
 

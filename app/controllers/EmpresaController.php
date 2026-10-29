@@ -25,6 +25,8 @@ class EmpresaController
         'mantenimiento' => 'En mantenimiento',
     ];
 
+    public const PROVINCIAS = ['San José', 'Alajuela', 'Cartago', 'Heredia', 'Guanacaste', 'Puntarenas', 'Limón'];
+
     private PDO $pdo;
 
     public function __construct(PDO $pdo)
@@ -157,20 +159,54 @@ class EmpresaController
     public function listarFlota(int $idEmpresa): array
     {
         $stmt = $this->pdo->prepare(
-            "SELECT id_vehiculo, placa, tipo_vehiculo, capacidad_kg, estado
-             FROM flota
-             WHERE id_empresa = :empresa AND activo = 1
-             ORDER BY placa"
+            "SELECT f.id_vehiculo, f.placa, f.tipo_vehiculo, f.capacidad_kg, f.estado, f.id_tarifa,
+                    zo.nombre AS zona_origen, zd.nombre AS zona_destino
+             FROM flota f
+             LEFT JOIN tarifas t ON t.id_tarifa = f.id_tarifa
+             LEFT JOIN zonas_cobertura zo ON zo.id_zona = t.id_zona_origen
+             LEFT JOIN zonas_cobertura zd ON zd.id_zona = t.id_zona_destino
+             WHERE f.id_empresa = :empresa AND f.activo = 1
+             ORDER BY f.placa"
         );
         $stmt->execute([':empresa' => $idEmpresa]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    // Retorna las rutas (tarifas activas) de la empresa para asignarlas a un vehiculo
+    public function listarRutasEmpresa(int $idEmpresa): array
+    {
+        $stmt = $this->pdo->prepare(
+            "SELECT t.id_tarifa, zo.nombre AS zona_origen, zd.nombre AS zona_destino
+             FROM tarifas t
+             INNER JOIN zonas_cobertura zo ON zo.id_zona = t.id_zona_origen
+             INNER JOIN zonas_cobertura zd ON zd.id_zona = t.id_zona_destino
+             WHERE t.id_empresa = :empresa AND t.activo = 1
+             ORDER BY zo.nombre, zd.nombre"
+        );
+        $stmt->execute([':empresa' => $idEmpresa]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    // Retorna el id de tarifa validado (debe ser de la empresa) o null si no se eligio ruta
+    private function resolverRuta(int $idEmpresa, array $datos): ?int
+    {
+        $idTarifa = (int) ($datos['id_tarifa'] ?? 0);
+        if ($idTarifa <= 0) {
+            return null;
+        }
+        foreach ($this->listarRutasEmpresa($idEmpresa) as $ruta) {
+            if ((int) $ruta['id_tarifa'] === $idTarifa) {
+                return $idTarifa;
+            }
+        }
+        return null;
     }
 
     // Retorna un vehiculo activo de la empresa (o null si no existe o no es suyo)
     public function obtenerVehiculo(int $idEmpresa, int $idVehiculo): ?array
     {
         $stmt = $this->pdo->prepare(
-            "SELECT id_vehiculo, placa, tipo_vehiculo, capacidad_kg, estado
+            "SELECT id_vehiculo, placa, tipo_vehiculo, capacidad_kg, estado, id_tarifa
              FROM flota
              WHERE id_vehiculo = :id AND id_empresa = :empresa AND activo = 1"
         );
@@ -195,7 +231,7 @@ class EmpresaController
             $errores[] = 'Escribe el tipo de vehículo (máximo 50 caracteres).';
         }
         if (!is_numeric($capacidad) || (float) $capacidad <= 0 || (float) $capacidad >= 100000000) {
-            $errores[] = 'La capacidad en kg debe ser un número mayor que cero.';
+            $errores[] = 'La capacidad en kg debe ser un número mayor que cero y menor que 100.000.000.';
         }
         if (!isset(self::ESTADOS_VEHICULO[$estado])) {
             $errores[] = 'Elige un estado de vehículo válido.';
@@ -214,10 +250,11 @@ class EmpresaController
 
         try {
             $stmt = $this->pdo->prepare(
-                "INSERT INTO flota (id_empresa, placa, tipo_vehiculo, capacidad_kg, estado)
-                 VALUES (:empresa, :placa, :tipo, :capacidad, :estado)"
+                "INSERT INTO flota (id_empresa, placa, tipo_vehiculo, capacidad_kg, estado, id_tarifa)
+                 VALUES (:empresa, :placa, :tipo, :capacidad, :estado, :tarifa)"
             );
             $stmt->execute([
+                ':tarifa'    => $this->resolverRuta($idEmpresa, $datos),
                 ':empresa'   => $idEmpresa,
                 ':placa'     => strtoupper(trim($datos['placa'])),
                 ':tipo'      => trim($datos['tipo_vehiculo']),
@@ -245,10 +282,11 @@ class EmpresaController
             $stmt = $this->pdo->prepare(
                 "UPDATE flota
                  SET placa = :placa, tipo_vehiculo = :tipo,
-                     capacidad_kg = :capacidad, estado = :estado
+                     capacidad_kg = :capacidad, estado = :estado, id_tarifa = :tarifa
                  WHERE id_vehiculo = :id AND id_empresa = :empresa AND activo = 1"
             );
             $stmt->execute([
+                ':tarifa'    => $this->resolverRuta($idEmpresa, $datos),
                 ':placa'     => strtoupper(trim($datos['placa'])),
                 ':tipo'      => trim($datos['tipo_vehiculo']),
                 ':capacidad' => str_replace(',', '.', trim($datos['capacidad_kg'])),
@@ -289,6 +327,227 @@ class EmpresaController
             return ['exito' => true];
         } catch (PDOException $e) {
             return ['exito' => false, 'errores' => [$this->mensajeAmigable($e)]];
+        }
+    }
+
+    /* =========================================================
+     *  Rutas y tarifas
+     * ========================================================= */
+
+    // Retorna las rutas activas de la empresa con sus zonas y precios
+    public function listarTarifas(int $idEmpresa): array
+    {
+        $stmt = $this->pdo->prepare(
+            "SELECT t.id_tarifa, zo.nombre AS zona_origen, zo.provincia AS provincia_origen,
+                    zd.nombre AS zona_destino, zd.provincia AS provincia_destino,
+                    t.distancia_km, t.precio_base, t.precio_por_km,
+                    (t.precio_base + t.precio_por_km * t.distancia_km) AS monto_estimado
+             FROM tarifas t
+             INNER JOIN zonas_cobertura zo ON zo.id_zona = t.id_zona_origen
+             INNER JOIN zonas_cobertura zd ON zd.id_zona = t.id_zona_destino
+             WHERE t.id_empresa = :empresa AND t.activo = 1
+             ORDER BY zo.nombre, zd.nombre"
+        );
+        $stmt->execute([':empresa' => $idEmpresa]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    // Retorna una ruta activa de la empresa (o null si no existe o no es suya)
+    public function obtenerTarifa(int $idEmpresa, int $idTarifa): ?array
+    {
+        foreach ($this->listarTarifas($idEmpresa) as $t) {
+            if ((int) $t['id_tarifa'] === $idTarifa) {
+                return $t;
+            }
+        }
+        return null;
+    }
+
+    // Convierte un texto numerico (acepta coma decimal) a float, o null si no es valido
+    private function numero(?string $valor): ?float
+    {
+        $valor = str_replace(',', '.', trim($valor ?? ''));
+        return is_numeric($valor) ? (float) $valor : null;
+    }
+
+    // Valida los precios y la distancia de una ruta; retorna la lista de errores
+    private function validarPrecios(array $d): array
+    {
+        $errores   = [];
+        $distancia = $this->numero($d['distancia_km'] ?? '');
+        $base      = $this->numero($d['precio_base'] ?? '');
+        $porKm     = $this->numero($d['precio_por_km'] ?? '');
+
+        if ($distancia === null || $distancia <= 0 || $distancia >= 1000000) {
+            $errores[] = 'La distancia debe ser un número mayor que cero.';
+        }
+        if ($base === null || $base < 0 || $base >= 100000000) {
+            $errores[] = 'La tarifa base debe ser un número igual o mayor que cero.';
+        }
+        if ($porKm === null || $porKm < 0 || $porKm >= 100000000) {
+            $errores[] = 'El precio por km debe ser un número igual o mayor que cero.';
+        }
+        return $errores;
+    }
+
+    // Retorna el id de la zona (la crea si no existe) y la asocia a la empresa
+    private function asegurarZona(int $idEmpresa, string $nombre, string $provincia): int
+    {
+        $stmt = $this->pdo->prepare(
+            "SELECT id_zona FROM zonas_cobertura WHERE nombre = :n AND provincia = :p"
+        );
+        $stmt->execute([':n' => $nombre, ':p' => $provincia]);
+        $idZona = $stmt->fetchColumn();
+
+        if ($idZona === false) {
+            $stmt = $this->pdo->prepare(
+                "INSERT INTO zonas_cobertura (nombre, provincia) OUTPUT INSERTED.id_zona
+                 VALUES (:n, :p)"
+            );
+            $stmt->execute([':n' => $nombre, ':p' => $provincia]);
+            $idZona = $stmt->fetchColumn();
+        }
+
+        $stmt = $this->pdo->prepare(
+            "IF NOT EXISTS (SELECT 1 FROM empresa_zona WHERE id_empresa = :e1 AND id_zona = :z1)
+                 INSERT INTO empresa_zona (id_empresa, id_zona) VALUES (:e2, :z2)"
+        );
+        $stmt->execute([':e1' => $idEmpresa, ':z1' => $idZona, ':e2' => $idEmpresa, ':z2' => $idZona]);
+        return (int) $idZona;
+    }
+
+    // Crea una ruta nueva (o reactiva una eliminada con el mismo origen y destino)
+    public function agregarTarifa(int $idEmpresa, array $datos): array
+    {
+        $errores = $this->validarPrecios($datos);
+        $origen  = trim($datos['origen'] ?? '');
+        $destino = trim($datos['destino'] ?? '');
+        $provOri = trim($datos['provincia_origen'] ?? '');
+        $provDes = trim($datos['provincia_destino'] ?? '');
+
+        foreach ([$origen, $destino] as $zona) {
+            if ($zona === '' || mb_strlen($zona) > 100) {
+                $errores[] = 'Escribe el origen y el destino (máximo 100 caracteres).';
+                break;
+            }
+        }
+        if (!in_array($provOri, self::PROVINCIAS, true) || !in_array($provDes, self::PROVINCIAS, true)) {
+            $errores[] = 'Elige la provincia del origen y del destino.';
+        }
+        if (!empty($errores)) {
+            return ['exito' => false, 'errores' => $errores];
+        }
+
+        try {
+            $this->pdo->beginTransaction();
+            $idOrigen  = $this->asegurarZona($idEmpresa, $origen, $provOri);
+            $idDestino = $this->asegurarZona($idEmpresa, $destino, $provDes);
+
+            $params = [
+                ':distancia' => $this->numero($datos['distancia_km']),
+                ':base'      => $this->numero($datos['precio_base']),
+                ':porkm'     => $this->numero($datos['precio_por_km']),
+                ':empresa'   => $idEmpresa,
+                ':origen'    => $idOrigen,
+                ':destino'   => $idDestino,
+            ];
+
+            $stmt = $this->pdo->prepare(
+                "SELECT id_tarifa, activo FROM tarifas
+                 WHERE id_empresa = :empresa AND id_zona_origen = :origen AND id_zona_destino = :destino"
+            );
+            $stmt->execute([':empresa' => $idEmpresa, ':origen' => $idOrigen, ':destino' => $idDestino]);
+            $existente = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if ($existente && (int) $existente['activo'] === 1) {
+                $this->pdo->rollBack();
+                return ['exito' => false, 'errores' => ['Ya tienes una ruta con ese origen y destino.']];
+            }
+
+            if ($existente) {
+                $stmt = $this->pdo->prepare(
+                    "UPDATE tarifas SET distancia_km = :distancia, precio_base = :base,
+                            precio_por_km = :porkm, activo = 1
+                     WHERE id_tarifa = :id"
+                );
+                $stmt->execute([
+                    ':distancia' => $params[':distancia'], ':base' => $params[':base'],
+                    ':porkm' => $params[':porkm'], ':id' => $existente['id_tarifa'],
+                ]);
+            } else {
+                $stmt = $this->pdo->prepare(
+                    "INSERT INTO tarifas (id_empresa, id_zona_origen, id_zona_destino,
+                                          distancia_km, precio_base, precio_por_km)
+                     VALUES (:empresa, :origen, :destino, :distancia, :base, :porkm)"
+                );
+                $stmt->execute($params);
+            }
+            $this->pdo->commit();
+            return ['exito' => true];
+        } catch (PDOException $e) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            return ['exito' => false, 'errores' => ['Ocurrió un error al guardar la ruta. Intenta de nuevo.']];
+        }
+    }
+
+    // Edita la distancia y los precios de una ruta activa de la empresa
+    public function editarTarifa(int $idEmpresa, int $idTarifa, array $datos): array
+    {
+        $errores = $this->validarPrecios($datos);
+        if ($idTarifa <= 0) {
+            $errores[] = 'La ruta indicada no es válida.';
+        }
+        if (!empty($errores)) {
+            return ['exito' => false, 'errores' => $errores];
+        }
+
+        try {
+            $stmt = $this->pdo->prepare(
+                "UPDATE tarifas SET distancia_km = :distancia, precio_base = :base, precio_por_km = :porkm
+                 WHERE id_tarifa = :id AND id_empresa = :empresa AND activo = 1"
+            );
+            $stmt->execute([
+                ':distancia' => $this->numero($datos['distancia_km']),
+                ':base'      => $this->numero($datos['precio_base']),
+                ':porkm'     => $this->numero($datos['precio_por_km']),
+                ':id'        => $idTarifa,
+                ':empresa'   => $idEmpresa,
+            ]);
+            if ($stmt->rowCount() === 0) {
+                return ['exito' => false, 'errores' => ['No encontramos esa ruta.']];
+            }
+            return ['exito' => true];
+        } catch (PDOException $e) {
+            return ['exito' => false, 'errores' => ['Ocurrió un error al guardar la ruta. Intenta de nuevo.']];
+        }
+    }
+
+    // Elimina logicamente una ruta (activo = 0) y la desasigna de los vehiculos
+    public function eliminarTarifa(int $idEmpresa, int $idTarifa): array
+    {
+        if ($idTarifa <= 0 || !$this->obtenerTarifa($idEmpresa, $idTarifa)) {
+            return ['exito' => false, 'errores' => ['No encontramos esa ruta.']];
+        }
+
+        try {
+            $this->pdo->beginTransaction();
+            $stmt = $this->pdo->prepare(
+                "UPDATE tarifas SET activo = 0 WHERE id_tarifa = :id AND id_empresa = :empresa"
+            );
+            $stmt->execute([':id' => $idTarifa, ':empresa' => $idEmpresa]);
+            $stmt = $this->pdo->prepare(
+                "UPDATE flota SET id_tarifa = NULL WHERE id_tarifa = :id AND id_empresa = :empresa"
+            );
+            $stmt->execute([':id' => $idTarifa, ':empresa' => $idEmpresa]);
+            $this->pdo->commit();
+            return ['exito' => true];
+        } catch (PDOException $e) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            return ['exito' => false, 'errores' => ['Ocurrió un error al eliminar la ruta. Intenta de nuevo.']];
         }
     }
 
