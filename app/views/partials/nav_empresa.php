@@ -13,6 +13,7 @@ $paginaActual = $paginaActual ?? '';
 $enlacesNav = [
     'perfil' => ['../empresa/perfil.php', 'Perfil'],
     'flota'  => ['../empresa/flota.php', 'Flota'],
+    'tarifas' => ['../empresa/tarifas.php', 'Rutas y tarifas'],
 ];
 ?>
 <header class="barra">

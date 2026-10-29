@@ -234,17 +234,18 @@ class ClienteController
     // Retorna el promedio y total de resenas de una empresa usando sp_calcular_calificacion_promedio
     public function obtenerCalificacion(int $idEmpresa): array
     {
-        try {
-            $stmt = $this->pdo->prepare("EXEC sp_calcular_calificacion_promedio @id_empresa = :id");
-            $stmt->execute([':id' => $idEmpresa]);
-            $fila = $stmt->fetch(PDO::FETCH_ASSOC);
-            return [
-                'promedio'      => (float) ($fila['promedio'] ?? 0),
-                'total_resenas' => (int) ($fila['total_resenas'] ?? 0),
-            ];
-        } catch (PDOException $e) {
-            return ['promedio' => 0.0, 'total_resenas' => 0];
+        $stmt = $this->pdo->prepare("EXEC sp_calcular_calificacion_promedio @id_empresa = :id");
+        $stmt->execute([':id' => $idEmpresa]);
+        $fila = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if ($fila === false) {
+            throw new RuntimeException('No se pudo obtener la calificación de la empresa.');
         }
+
+        return [
+            'promedio'      => (float) $fila['promedio'],
+            'total_resenas' => (int) $fila['total_resenas'],
+        ];
     }
 
     // Retorna las zonas donde trabaja una empresa
