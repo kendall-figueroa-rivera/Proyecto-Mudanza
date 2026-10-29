@@ -298,3 +298,62 @@ BEGIN
     END CATCH
 END
 GO
+
+CREATE OR ALTER PROCEDURE dbo.sp_suspender_empresa
+    @id_empresa INT,
+    @id_admin INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+
+    DECLARE @id_usuario_empresa INT;
+
+    BEGIN TRY
+        IF NOT EXISTS (
+            SELECT 1
+            FROM dbo.usuarios u
+            INNER JOIN dbo.roles r ON r.id_rol = u.id_rol
+            WHERE u.id_usuario = @id_admin
+              AND r.nombre = 'administrador'
+              AND u.activo = 1
+        )
+        BEGIN
+            ;THROW 50054, N'Solo un administrador activo puede suspender empresas.', 1;
+        END
+
+        BEGIN TRANSACTION;
+
+        SELECT @id_usuario_empresa = id_usuario
+        FROM dbo.empresas WITH (UPDLOCK, HOLDLOCK)
+        WHERE id_empresa = @id_empresa
+          AND estado = 'activa';
+
+        IF @id_usuario_empresa IS NULL
+        BEGIN
+            ;THROW 50055, N'La empresa no existe o no está activa.', 1;
+        END
+
+        UPDATE dbo.empresas
+        SET estado = 'suspendida',
+            id_admin_revision = @id_admin,
+            fecha_revision = GETDATE()
+        WHERE id_empresa = @id_empresa
+          AND estado = 'activa';
+
+        INSERT INTO dbo.notificaciones (id_usuario, mensaje)
+        VALUES (
+            @id_usuario_empresa,
+            N'Tu empresa fue suspendida por un administrador.'
+        );
+
+        COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0
+            ROLLBACK TRANSACTION;
+
+        THROW;
+    END CATCH
+END
+GO
