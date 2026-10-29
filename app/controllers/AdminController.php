@@ -68,7 +68,7 @@ class AdminController
         return $aviso;
     }
 
-    // Lista empresas, su estado y los datos de contacto de su propietario - arraylist
+    // Lista empresas, su estado y los datos de contacto de su propietario
     public function listarEmpresas(): array
     {
         $stmt = $this->pdo->query(
@@ -120,55 +120,25 @@ class AdminController
         }
     }
 
-    // Suspende una empresa activa y notifica a su propietario
+    // Suspende una empresa activa y registra al administrador que realizó la acción
     public function suspenderEmpresa(int $idEmpresa): array
     {
         try {
-            $this->pdo->beginTransaction();
+            $idAdmin = self::exigirAdministrador();
 
             $stmt = $this->pdo->prepare(
-                "SELECT id_usuario
-                 FROM empresas
-                 WHERE id_empresa = :id_empresa
-                   AND estado = 'activa'"
+                "EXEC dbo.sp_suspender_empresa
+                    @id_empresa = :id_empresa,
+                    @id_admin = :id_admin"
             );
-            $stmt->execute([':id_empresa' => $idEmpresa]);
-            $empresa = $stmt->fetch(PDO::FETCH_ASSOC);
 
-            if (!$empresa) {
-                $this->pdo->rollBack();
-
-                return [
-                    'exito' => false,
-                    'errores' => ['La empresa no existe o no está activa.'],
-                ];
-            }
-
-            $actualizar = $this->pdo->prepare(
-                "UPDATE empresas
-                 SET estado = 'suspendida'
-                 WHERE id_empresa = :id_empresa
-                   AND estado = 'activa'"
-            );
-            $actualizar->execute([':id_empresa' => $idEmpresa]);
-
-            $notificar = $this->pdo->prepare(
-                "INSERT INTO notificaciones (id_usuario, mensaje)
-                 VALUES (:id_usuario, :mensaje)"
-            );
-            $notificar->execute([
-                ':id_usuario' => (int) $empresa['id_usuario'],
-                ':mensaje' => 'Tu empresa fue suspendida por un administrador.',
+            $stmt->execute([
+                ':id_empresa' => $idEmpresa,
+                ':id_admin' => $idAdmin,
             ]);
-
-            $this->pdo->commit();
 
             return ['exito' => true, 'errores' => []];
         } catch (PDOException $e) {
-            if ($this->pdo->inTransaction()) {
-                $this->pdo->rollBack();
-            }
-
             return [
                 'exito' => false,
                 'errores' => [$this->mensajeAmigable($e)],
@@ -188,7 +158,7 @@ class AdminController
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    // localiza zona por idZona (identificador)
+    // Localiza una zona por su identificador
     public function obtenerZona(int $idZona): ?array
     {
         $stmt = $this->pdo->prepare(
@@ -339,6 +309,14 @@ class AdminController
 
         if ($codigoSql === 547) {
             return 'No se puede eliminar esa zona porque está asociada a empresas o tarifas.';
+        }
+
+        if ($codigoSql === 50054) {
+            return 'Solo un administrador activo puede suspender empresas.';
+        }
+
+        if ($codigoSql === 50055) {
+            return 'La empresa no existe o no está activa.';
         }
 
         return 'Lo sentimos, no se pudo completar la solicitud. Revisa los datos y vuelve a intentarlo.';

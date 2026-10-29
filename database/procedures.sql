@@ -299,6 +299,8 @@ BEGIN
 END
 GO
 
+USE plataforma_mudanzas;
+GO
 CREATE OR ALTER PROCEDURE dbo.sp_suspender_empresa
     @id_empresa INT,
     @id_admin INT
@@ -357,3 +359,4 @@ BEGIN
     END CATCH
 END
 GO
+
