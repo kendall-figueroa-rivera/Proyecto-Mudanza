@@ -67,6 +67,7 @@ $editando = $vehiculoEditar !== null;
 $form = $_SERVER['REQUEST_METHOD'] === 'POST' ? $_POST : ($vehiculoEditar ?? []);
 
 $flota = $controlador->listarFlota($idEmpresa);
+$rutas = $controlador->listarRutasEmpresa($idEmpresa);
 $aviso = EmpresaController::tomarAviso();
 $csrf  = EmpresaController::tokenCsrf();
 $paginaActual = 'flota';
@@ -126,7 +127,21 @@ $paginaActual = 'flota';
           <label class="form-label" for="capacidad_kg">Capacidad (kg)</label>
           <input class="form-control" type="text" inputmode="decimal" id="capacidad_kg" name="capacidad_kg" required
                  value="<?= h($form['capacidad_kg'] ?? '') ?>">
-          <div class="invalid-feedback">Escribe un número mayor que cero.</div>
+          <div class="invalid-feedback">Escribe un número mayor que cero y menor que 100.000.000.</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="id_tarifa">Ruta que realiza</label>
+          <select class="form-select" id="id_tarifa" name="id_tarifa">
+            <option value="">Sin ruta asignada</option>
+            <?php foreach ($rutas as $r): ?>
+              <option value="<?= (int) $r['id_tarifa'] ?>" <?= (int) ($form['id_tarifa'] ?? 0) === (int) $r['id_tarifa'] ? 'selected' : '' ?>>
+                <?= h($r['zona_origen']) ?> a <?= h($r['zona_destino']) ?>
+              </option>
+            <?php endforeach; ?>
+          </select>
+          <?php if (empty($rutas)): ?>
+            <div class="form-text">Primero crea rutas en la sección de tarifas.</div>
+          <?php endif; ?>
         </div>
         <div class="mb-4">
           <label class="form-label" for="estado">Estado</label>
@@ -158,6 +173,9 @@ $paginaActual = 'flota';
                 <div class="meta">
                   Capacidad: <?= h(number_format((float) $v['capacidad_kg'], 2, ',', '.')) ?> kg ·
                   <?= h(EmpresaController::ESTADOS_VEHICULO[$v['estado']] ?? $v['estado']) ?>
+                </div>
+                <div class="meta">
+                  Ruta: <?= !empty($v['zona_origen']) ? h($v['zona_origen']) . ' a ' . h($v['zona_destino']) : 'Sin ruta asignada' ?>
                 </div>
               </div>
               <div class="col-md-4 text-md-end d-flex gap-2 justify-content-md-end flex-wrap">

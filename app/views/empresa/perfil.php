@@ -111,9 +111,16 @@ $valor = fn(string $campo) => $_POST[$campo] ?? ($empresa[$campo] ?? '');
                   data-contador="contadorDescripcion"><?= h($valor('descripcion')) ?></textarea>
         <div class="form-text" id="contadorDescripcion"></div>
       </div>
-      <button class="btn btn-mostaza" type="submit">Guardar cambios</button>
-      <a class="btn btn-contorno" href="flota.php">Agregar o modificar flota</a>
-      <a class="btn btn-contorno" href="../publico/home.php">Volver al inicio</a>
+      <div class="d-flex flex-wrap gap-2">
+        <button class="btn btn-mostaza" type="submit">Guardar cambios</button>
+        <a class="btn btn-contorno" href="tarifas.php">Gestionar rutas y tarifas</a>
+        <?php if ($empresa['estado'] === 'activa'): ?>
+          <a class="btn btn-contorno"
+             href="../publico/perfil_empresa.php?id=<?= (int) $empresa['id_empresa'] ?>">Ver perfil público</a>
+        <?php endif; ?>
+        <a class="btn btn-contorno" href="flota.php">Agregar o modificar flota</a>
+        <a class="btn btn-contorno" href="../publico/home.php">Volver al inicio</a>
+      </div>
     </form>
   <?php endif; ?>
 </main>

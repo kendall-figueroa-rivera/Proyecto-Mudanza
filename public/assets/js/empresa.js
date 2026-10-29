@@ -34,6 +34,28 @@ $(function () {
         if (!valido) e.preventDefault();
     });
 
+    // Valida la ruta: origen/destino (al crear), distancia mayor que cero y precios no negativos
+    $('#formTarifa').on('submit', function (e) {
+        let valido = true;
+        const num = (id) => parseFloat($.trim($(id).val()).replace(',', '.'));
+        ['#origen', '#destino', '#provincia_origen', '#provincia_destino'].forEach(function (id) {
+            if ($(id).length) {
+                valido = marcarCampo($(id), $.trim($(id).val()) !== '') && valido;
+            }
+        });
+        valido = marcarCampo($('#distancia_km'), !isNaN(num('#distancia_km')) && num('#distancia_km') > 0) && valido;
+        valido = marcarCampo($('#precio_base'), !isNaN(num('#precio_base')) && num('#precio_base') >= 0) && valido;
+        valido = marcarCampo($('#precio_por_km'), !isNaN(num('#precio_por_km')) && num('#precio_por_km') >= 0) && valido;
+        if (!valido) e.preventDefault();
+    });
+
+    // Pide confirmacion antes de eliminar una ruta
+    $('.form-eliminar-ruta').on('submit', function (e) {
+        if (!confirm('Eliminar la ruta ' + $(this).data('ruta') + '?')) {
+            e.preventDefault();
+        }
+    });
+
     // Pide confirmacion antes de eliminar un vehiculo
     $('.form-eliminar').on('submit', function (e) {
         if (!confirm('¿Eliminar el vehículo ' + $(this).data('placa') + ' de tu flota?')) {
