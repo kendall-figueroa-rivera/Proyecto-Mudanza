@@ -158,6 +158,7 @@ $empresasDestacadas = $stmt->fetchAll(PDO::FETCH_ASSOC);
     .pasos, .empresas, .modulos{ grid-template-columns:1fr; }
     .ruta-buscador button{ width:100%; }
   }
+.acciones-empresa { display: flex; gap: 12px; flex-wrap: wrap; }
 </style>
 </head>
 <body>
@@ -301,7 +302,7 @@ $empresasDestacadas = $stmt->fetchAll(PDO::FETCH_ASSOC);
         <h2>¿Tenés una empresa de transporte?</h2>
         <p>Registrá tu flota, definí tus tarifas por ruta y empezá a recibir solicitudes de clientes reales.</p>
       </div>
-      <div style="display:flex; gap:12px; flex-wrap:wrap;">
+      <div class="acciones-empresa">
         <a href="<?= $rolActual === 'empresa' ? '../empresa/perfil.php' : '../auth/login.php' ?>" class="btn btn-solid">Acceder a mi empresa</a>
         <?php if (!$haySesion): ?>
           <a href="../auth/registro.php" class="btn btn-accent">Registrar mi empresa</a>

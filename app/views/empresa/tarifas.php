@@ -4,8 +4,9 @@
  * Modulo: Empresa
  * Responsable: Santiago Correa Fallas
  * Descripcion: Gestion de las rutas y tarifas de la empresa. Permite crear
- *              rutas (origen y destino), editar distancia y precios (con
- *              ?editar=N) y eliminarlas logicamente (activo = 0).
+ *              rutas eligiendo origen y destino del catalogo de zonas, editar
+ *              distancia y precios (con ?editar=N) y eliminarlas logicamente
+ *              (activo = 0).
  */
 
 session_start();
@@ -67,6 +68,12 @@ $editando = $tarifaEditar !== null;
 $form = $_SERVER['REQUEST_METHOD'] === 'POST' ? $_POST : ($tarifaEditar ?? []);
 
 $tarifas = $controlador->listarTarifas($idEmpresa);
+
+// Catalogo de zonas agrupado por provincia para los <select> de origen y destino
+$zonasPorProvincia = [];
+foreach ($controlador->listarZonas() as $z) {
+    $zonasPorProvincia[$z['provincia']][] = $z;
+}
 $aviso = EmpresaController::tomarAviso();
 $csrf  = EmpresaController::tokenCsrf();
 $paginaActual = 'tarifas';
@@ -112,57 +119,51 @@ $colones = fn($n) => '₡' . number_format((float) $n, 2, ',', '.');
           <input type="hidden" name="id_tarifa" value="<?= (int) $tarifaEditar['id_tarifa'] ?>">
           <p class="mb-3"><strong><?= h($tarifaEditar['zona_origen']) ?> a <?= h($tarifaEditar['zona_destino']) ?></strong></p>
         <?php else: ?>
-          <div class="mb-3">
-            <label class="form-label" for="origen">Origen</label>
-            <input class="form-control" type="text" id="origen" name="origen" maxlength="100" required
-                   placeholder="Ej. Curridabat" value="<?= h($form['origen'] ?? '') ?>">
-            <div class="invalid-feedback">Escribe el origen.</div>
-          </div>
-          <div class="mb-3">
-            <label class="form-label" for="provincia_origen">Provincia del origen</label>
-            <select class="form-select" id="provincia_origen" name="provincia_origen" required>
-              <option value="">Elige una provincia</option>
-              <?php foreach (EmpresaController::PROVINCIAS as $p): ?>
-                <option value="<?= h($p) ?>" <?= ($form['provincia_origen'] ?? '') === $p ? 'selected' : '' ?>><?= h($p) ?></option>
-              <?php endforeach; ?>
-            </select>
-            <div class="invalid-feedback">Elige una provincia.</div>
-          </div>
-          <div class="mb-3">
-            <label class="form-label" for="destino">Destino</label>
-            <input class="form-control" type="text" id="destino" name="destino" maxlength="100" required
-                   placeholder="Ej. Heredia Centro" value="<?= h($form['destino'] ?? '') ?>">
-            <div class="invalid-feedback">Escribe el destino.</div>
-          </div>
-          <div class="mb-3">
-            <label class="form-label" for="provincia_destino">Provincia del destino</label>
-            <select class="form-select" id="provincia_destino" name="provincia_destino" required>
-              <option value="">Elige una provincia</option>
-              <?php foreach (EmpresaController::PROVINCIAS as $p): ?>
-                <option value="<?= h($p) ?>" <?= ($form['provincia_destino'] ?? '') === $p ? 'selected' : '' ?>><?= h($p) ?></option>
-              <?php endforeach; ?>
-            </select>
-            <div class="invalid-feedback">Elige una provincia.</div>
-          </div>
+          <?php if (empty($zonasPorProvincia)): ?>
+            <div class="alert alert-warning">Todavía no hay zonas en el catálogo. Pide al administrador que las agregue.</div>
+          <?php endif; ?>
+          <?php foreach (['zona_origen' => 'Origen', 'zona_destino' => 'Destino'] as $campo => $etiqueta): ?>
+            <div class="mb-3">
+              <label class="form-label" for="<?= $campo ?>"><?= $etiqueta ?></label>
+              <select class="form-select" id="<?= $campo ?>" name="<?= $campo ?>" required>
+                <option value="">Elige una zona</option>
+                <?php foreach ($zonasPorProvincia as $provincia => $lista): ?>
+                  <optgroup label="<?= h($provincia) ?>">
+                    <?php foreach ($lista as $z): ?>
+                      <option value="<?= (int) $z['id_zona'] ?>" <?= (int) ($form[$campo] ?? 0) === (int) $z['id_zona'] ? 'selected' : '' ?>>
+                        <?= h($z['nombre']) ?>
+                      </option>
+                    <?php endforeach; ?>
+                  </optgroup>
+                <?php endforeach; ?>
+              </select>
+              <div class="invalid-feedback">Elige una zona de la lista.</div>
+            </div>
+          <?php endforeach; ?>
+          <p class="form-text mb-3">¿Falta una zona? Pide al administrador que la agregue al catálogo.</p>
         <?php endif; ?>
 
         <div class="mb-3">
           <label class="form-label" for="distancia_km">Distancia (km)</label>
           <input class="form-control" type="text" inputmode="decimal" id="distancia_km" name="distancia_km" required
+                 placeholder="Ej. 25"
                  value="<?= h($form['distancia_km'] ?? '') ?>">
-          <div class="invalid-feedback">Escribe un número mayor que cero.</div>
+          <div class="invalid-feedback">Escribe un número mayor que cero, sin puntos de miles.</div>
         </div>
         <div class="mb-3">
           <label class="form-label" for="precio_base">Tarifa base (₡)</label>
           <input class="form-control" type="text" inputmode="decimal" id="precio_base" name="precio_base" required
+                 placeholder="Ej. 45000"
                  value="<?= h($form['precio_base'] ?? '') ?>">
-          <div class="invalid-feedback">Escribe un número igual o mayor que cero.</div>
+          <div class="invalid-feedback">Escribe solo números, sin puntos de miles (máximo 2 decimales).</div>
         </div>
         <div class="mb-4">
           <label class="form-label" for="precio_por_km">Precio por km (₡)</label>
           <input class="form-control" type="text" inputmode="decimal" id="precio_por_km" name="precio_por_km" required
+                 placeholder="Ej. 1500"
                  value="<?= h($form['precio_por_km'] ?? '') ?>">
-          <div class="invalid-feedback">Escribe un número igual o mayor que cero.</div>
+          <div class="invalid-feedback">Escribe solo números, sin puntos de miles (máximo 2 decimales).</div>
+          <div class="form-text">La tarifa base y el precio por km no pueden ser ambos cero.</div>
         </div>
         <div class="d-flex gap-2 flex-wrap">
           <button class="btn btn-mostaza" type="submit"><?= $editando ? 'Guardar cambios' : 'Agregar ruta' ?></button>
