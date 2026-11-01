@@ -230,7 +230,8 @@ BEGIN
            ISNULL(CAST(AVG(CAST(calificacion AS DECIMAL(4,2))) AS DECIMAL(3,2)), 0) AS promedio,
            COUNT(*) AS total_resenas
     FROM resenas
-    WHERE id_empresa = @id_empresa;
+    WHERE id_empresa = @id_empresa
+      AND estado = 'visible';
 END
 GO
 

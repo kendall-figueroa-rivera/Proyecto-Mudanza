@@ -234,6 +234,7 @@ class ClienteController
     // Retorna el promedio y total de resenas de una empresa usando sp_calcular_calificacion_promedio
     public function obtenerCalificacion(int $idEmpresa): array
     {
+        // Si el procedimiento falla, el perfil publico sigue funcionando y muestra 0 estrellas
         try {
             $stmt = $this->pdo->prepare("EXEC sp_calcular_calificacion_promedio @id_empresa = :id");
             $stmt->execute([':id' => $idEmpresa]);
