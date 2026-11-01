@@ -1,8 +1,8 @@
 /**
  * Archivo: empresa.js
  * Modulo: Empresa
- * Responsable: [Santiago Correa Fallas]
- * Descripcion: Validaciones de los formularios de perfil y flota (lado
+ * Responsable: Santiago Correa Fallas
+ * Descripcion: Validaciones de los formularios de perfil, flota y tarifas (lado
  *              cliente). La validacion definitiva ocurre tambien en el
  *              servidor (EmpresaController.php).
  */
@@ -34,18 +34,36 @@ $(function () {
         if (!valido) e.preventDefault();
     });
 
-    // Valida la ruta: origen/destino (al crear), distancia mayor que cero y precios no negativos
+    // Retorna el valor numerico de un campo, o NaN si no tiene el formato aceptado:
+    // solo digitos y hasta 2 decimales, sin puntos de miles ("50.000" se rechaza)
+    function numeroCampo(id) {
+        const texto = $.trim($(id).val());
+        if (!/^(\d+([.,]\d{1,2})?|[.,]\d{1,2})$/.test(texto)) {
+            return NaN;
+        }
+        return parseFloat(texto.replace(',', '.'));
+    }
+
+    // Valida la ruta: zonas elegidas (al crear), distancia mayor que cero,
+    // precios con formato correcto y que no sean ambos cero
     $('#formTarifa').on('submit', function (e) {
         let valido = true;
-        const num = (id) => parseFloat($.trim($(id).val()).replace(',', '.'));
-        ['#origen', '#destino', '#provincia_origen', '#provincia_destino'].forEach(function (id) {
+        ['#zona_origen', '#zona_destino'].forEach(function (id) {
             if ($(id).length) {
-                valido = marcarCampo($(id), $.trim($(id).val()) !== '') && valido;
+                valido = marcarCampo($(id), $(id).val() !== '') && valido;
             }
         });
-        valido = marcarCampo($('#distancia_km'), !isNaN(num('#distancia_km')) && num('#distancia_km') > 0) && valido;
-        valido = marcarCampo($('#precio_base'), !isNaN(num('#precio_base')) && num('#precio_base') >= 0) && valido;
-        valido = marcarCampo($('#precio_por_km'), !isNaN(num('#precio_por_km')) && num('#precio_por_km') >= 0) && valido;
+        const distancia = numeroCampo('#distancia_km');
+        const base = numeroCampo('#precio_base');
+        const porKm = numeroCampo('#precio_por_km');
+        valido = marcarCampo($('#distancia_km'), !isNaN(distancia) && distancia > 0) && valido;
+        valido = marcarCampo($('#precio_base'), !isNaN(base)) && valido;
+        valido = marcarCampo($('#precio_por_km'), !isNaN(porKm)) && valido;
+        if (!isNaN(base) && !isNaN(porKm) && base + porKm <= 0) {
+            marcarCampo($('#precio_base'), false);
+            marcarCampo($('#precio_por_km'), false);
+            valido = false;
+        }
         if (!valido) e.preventDefault();
     });
 

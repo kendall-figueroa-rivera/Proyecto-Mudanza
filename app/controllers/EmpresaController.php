@@ -2,10 +2,11 @@
 /**
  * Archivo: EmpresaController.php
  * Modulo: Empresa
- * Responsable: [nombre del integrante]
- * Descripcion: Controla el perfil de la empresa (consulta y edicion) y el CRUD
- *              de la flota de vehiculos (agregar, editar y eliminar). La
- *              eliminacion de vehiculos es logica: se marca activo = 0.
+ * Responsable: Santiago Correa Fallas
+ * Descripcion: Controla el perfil de la empresa (consulta y edicion), el CRUD
+ *              de la flota de vehiculos y el de rutas y tarifas. Las zonas de
+ *              las rutas se eligen del catalogo que administra el admin. La
+ *              eliminacion de vehiculos y rutas es logica: se marca activo = 0.
  */
 
 // Escapa texto para imprimirlo de forma segura dentro del HTML
@@ -24,8 +25,6 @@ class EmpresaController
         'en_servicio'   => 'En servicio',
         'mantenimiento' => 'En mantenimiento',
     ];
-
-    public const PROVINCIAS = ['San José', 'Alajuela', 'Cartago', 'Heredia', 'Guanacaste', 'Puntarenas', 'Limón'];
 
     private PDO $pdo;
 
@@ -248,19 +247,50 @@ class EmpresaController
             return ['exito' => false, 'errores' => $errores];
         }
 
+        $placa = strtoupper(trim($datos['placa']));
+        $valores = [
+            ':tarifa'    => $this->resolverRuta($idEmpresa, $datos),
+            ':placa'     => $placa,
+            ':tipo'      => trim($datos['tipo_vehiculo']),
+            ':capacidad' => str_replace(',', '.', trim($datos['capacidad_kg'])),
+            ':estado'    => $datos['estado'],
+        ];
+
         try {
-            $stmt = $this->pdo->prepare(
-                "INSERT INTO flota (id_empresa, placa, tipo_vehiculo, capacidad_kg, estado, id_tarifa)
-                 VALUES (:empresa, :placa, :tipo, :capacidad, :estado, :tarifa)"
-            );
-            $stmt->execute([
-                ':tarifa'    => $this->resolverRuta($idEmpresa, $datos),
-                ':empresa'   => $idEmpresa,
-                ':placa'     => strtoupper(trim($datos['placa'])),
-                ':tipo'      => trim($datos['tipo_vehiculo']),
-                ':capacidad' => str_replace(',', '.', trim($datos['capacidad_kg'])),
-                ':estado'    => $datos['estado'],
-            ]);
+            // La placa es UNIQUE en la tabla y la eliminacion es logica, asi que una placa
+            // eliminada sigue ocupada: si es de esta empresa se reactiva con los datos nuevos
+            $stmt = $this->pdo->prepare("SELECT id_vehiculo, id_empresa, activo FROM flota WHERE placa = :placa");
+            $stmt->execute([':placa' => $placa]);
+            $existente = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if ($existente && (int) $existente['activo'] === 1) {
+                return ['exito' => false, 'errores' => [
+                    (int) $existente['id_empresa'] === $idEmpresa
+                        ? 'Ya tienes un vehículo registrado con esa placa.'
+                        : 'Esa placa ya está registrada por otra empresa.',
+                ]];
+            }
+            if ($existente && (int) $existente['id_empresa'] !== $idEmpresa) {
+                return ['exito' => false, 'errores' => [
+                    'Esa placa estuvo registrada por otra empresa. Contacta a soporte para liberarla.',
+                ]];
+            }
+
+            if ($existente) {
+                $stmt = $this->pdo->prepare(
+                    "UPDATE flota
+                     SET tipo_vehiculo = :tipo, capacidad_kg = :capacidad, estado = :estado,
+                         id_tarifa = :tarifa, placa = :placa, activo = 1
+                     WHERE id_vehiculo = :id"
+                );
+                $stmt->execute($valores + [':id' => $existente['id_vehiculo']]);
+            } else {
+                $stmt = $this->pdo->prepare(
+                    "INSERT INTO flota (id_empresa, placa, tipo_vehiculo, capacidad_kg, estado, id_tarifa)
+                     VALUES (:empresa, :placa, :tipo, :capacidad, :estado, :tarifa)"
+                );
+                $stmt->execute($valores + [':empresa' => $idEmpresa]);
+            }
             return ['exito' => true];
         } catch (PDOException $e) {
             return ['exito' => false, 'errores' => [$this->mensajeAmigable($e)]];
@@ -363,11 +393,16 @@ class EmpresaController
         return null;
     }
 
-    // Convierte un texto numerico (acepta coma decimal) a float, o null si no es valido
+    // Convierte un texto numerico a float, o null si no es valido. Acepta solo digitos
+    // con un separador decimal opcional (punto o coma) y hasta 2 decimales, para que
+    // "50.000" (punto de miles) se rechace en vez de guardarse como 50
     private function numero(?string $valor): ?float
     {
-        $valor = str_replace(',', '.', trim($valor ?? ''));
-        return is_numeric($valor) ? (float) $valor : null;
+        $valor = trim($valor ?? '');
+        if (!preg_match('/^(\d+([.,]\d{1,2})?|[.,]\d{1,2})$/', $valor)) {
+            return null;
+        }
+        return (float) str_replace(',', '.', $valor);
     }
 
     // Valida los precios y la distancia de una ruta; retorna la lista de errores
@@ -378,61 +413,71 @@ class EmpresaController
         $base      = $this->numero($d['precio_base'] ?? '');
         $porKm     = $this->numero($d['precio_por_km'] ?? '');
 
-        if ($distancia === null || $distancia <= 0 || $distancia >= 1000000) {
-            $errores[] = 'La distancia debe ser un número mayor que cero.';
+        $formato = 'solo con números, sin puntos de miles y con máximo 2 decimales (ej. 45000 o 45000,50).';
+
+        if ($distancia === null) {
+            $errores[] = 'Escribe la distancia ' . $formato;
+        } elseif ($distancia <= 0 || $distancia >= 1000000) {
+            $errores[] = 'La distancia debe ser mayor que cero.';
         }
-        if ($base === null || $base < 0 || $base >= 100000000) {
-            $errores[] = 'La tarifa base debe ser un número igual o mayor que cero.';
+        if ($base === null) {
+            $errores[] = 'Escribe la tarifa base ' . $formato;
+        } elseif ($base >= 100000000) {
+            $errores[] = 'La tarifa base es demasiado alta.';
         }
-        if ($porKm === null || $porKm < 0 || $porKm >= 100000000) {
-            $errores[] = 'El precio por km debe ser un número igual o mayor que cero.';
+        if ($porKm === null) {
+            $errores[] = 'Escribe el precio por km ' . $formato;
+        } elseif ($porKm >= 100000000) {
+            $errores[] = 'El precio por km es demasiado alto.';
+        }
+        if ($base !== null && $porKm !== null && $base + $porKm <= 0) {
+            $errores[] = 'La tarifa base y el precio por km no pueden ser ambos cero.';
         }
         return $errores;
     }
 
-    // Retorna el id de la zona (la crea si no existe) y la asocia a la empresa
-    private function asegurarZona(int $idEmpresa, string $nombre, string $provincia): int
+    // Retorna el catalogo de zonas (lo administra el admin) para elegir origen y destino
+    public function listarZonas(): array
     {
-        $stmt = $this->pdo->prepare(
-            "SELECT id_zona FROM zonas_cobertura WHERE nombre = :n AND provincia = :p"
+        $stmt = $this->pdo->query(
+            "SELECT id_zona, nombre, provincia, canton
+             FROM zonas_cobertura
+             ORDER BY provincia, nombre"
         );
-        $stmt->execute([':n' => $nombre, ':p' => $provincia]);
-        $idZona = $stmt->fetchColumn();
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
 
-        if ($idZona === false) {
-            $stmt = $this->pdo->prepare(
-                "INSERT INTO zonas_cobertura (nombre, provincia) OUTPUT INSERTED.id_zona
-                 VALUES (:n, :p)"
-            );
-            $stmt->execute([':n' => $nombre, ':p' => $provincia]);
-            $idZona = $stmt->fetchColumn();
-        }
+    // Indica si una zona existe en el catalogo
+    private function zonaExiste(int $idZona): bool
+    {
+        $stmt = $this->pdo->prepare("SELECT 1 FROM zonas_cobertura WHERE id_zona = :id");
+        $stmt->execute([':id' => $idZona]);
+        return $stmt->fetchColumn() !== false;
+    }
 
+    // Asocia una zona del catalogo a la empresa si todavia no lo esta
+    // (las tarifas lo exigen por llave foranea y sp_generar_proforma lo valida)
+    private function asociarZona(int $idEmpresa, int $idZona): void
+    {
         $stmt = $this->pdo->prepare(
             "IF NOT EXISTS (SELECT 1 FROM empresa_zona WHERE id_empresa = :e1 AND id_zona = :z1)
                  INSERT INTO empresa_zona (id_empresa, id_zona) VALUES (:e2, :z2)"
         );
         $stmt->execute([':e1' => $idEmpresa, ':z1' => $idZona, ':e2' => $idEmpresa, ':z2' => $idZona]);
-        return (int) $idZona;
     }
 
     // Crea una ruta nueva (o reactiva una eliminada con el mismo origen y destino)
     public function agregarTarifa(int $idEmpresa, array $datos): array
     {
-        $errores = $this->validarPrecios($datos);
-        $origen  = trim($datos['origen'] ?? '');
-        $destino = trim($datos['destino'] ?? '');
-        $provOri = trim($datos['provincia_origen'] ?? '');
-        $provDes = trim($datos['provincia_destino'] ?? '');
+        $errores   = $this->validarPrecios($datos);
+        $idOrigen  = (int) ($datos['zona_origen'] ?? 0);
+        $idDestino = (int) ($datos['zona_destino'] ?? 0);
 
-        foreach ([$origen, $destino] as $zona) {
-            if ($zona === '' || mb_strlen($zona) > 100) {
-                $errores[] = 'Escribe el origen y el destino (máximo 100 caracteres).';
-                break;
-            }
+        if ($idOrigen <= 0 || !$this->zonaExiste($idOrigen)) {
+            $errores[] = 'Elige la zona de origen de la lista.';
         }
-        if (!in_array($provOri, self::PROVINCIAS, true) || !in_array($provDes, self::PROVINCIAS, true)) {
-            $errores[] = 'Elige la provincia del origen y del destino.';
+        if ($idDestino <= 0 || !$this->zonaExiste($idDestino)) {
+            $errores[] = 'Elige la zona de destino de la lista.';
         }
         if (!empty($errores)) {
             return ['exito' => false, 'errores' => $errores];
@@ -440,8 +485,8 @@ class EmpresaController
 
         try {
             $this->pdo->beginTransaction();
-            $idOrigen  = $this->asegurarZona($idEmpresa, $origen, $provOri);
-            $idDestino = $this->asegurarZona($idEmpresa, $destino, $provDes);
+            $this->asociarZona($idEmpresa, $idOrigen);
+            $this->asociarZona($idEmpresa, $idDestino);
 
             $params = [
                 ':distancia' => $this->numero($datos['distancia_km']),
