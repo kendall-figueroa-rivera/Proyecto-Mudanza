@@ -13,6 +13,7 @@ $enlacesNav = [
     'dashboard' => ['../admin/dashboard.php', 'Mi panel'],
     'empresas'  => ['../admin/empresas.php', 'Empresas'],
     'zonas'     => ['../admin/zonas.php', 'Zonas'],
+    'mi_cuenta' => ['../auth/mi_cuenta.php', 'Mi cuenta'],
 ];
 ?>
 

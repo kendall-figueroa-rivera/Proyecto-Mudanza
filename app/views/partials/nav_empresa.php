@@ -14,6 +14,7 @@ $enlacesNav = [
     'perfil' => ['../empresa/perfil.php', 'Perfil'],
     'flota'  => ['../empresa/flota.php', 'Flota'],
     'tarifas' => ['../empresa/tarifas.php', 'Rutas y tarifas'],
+    'mi_cuenta' => ['../auth/mi_cuenta.php', 'Mi cuenta'],
 ];
 ?>
 <header class="barra">
