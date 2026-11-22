@@ -63,6 +63,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <div class="alerta alerta-ok">Cuenta creada correctamente. Ya podés iniciar sesión.</div>
       <?php endif; ?>
 
+      <?php if (isset($_GET['restablecida'])): ?>
+        <div class="alerta alerta-ok">Tu contraseña se cambió correctamente. Ya podés iniciar sesión.</div>
+      <?php endif; ?>
+
       <?php if ($resultado && !$resultado['exito']): ?>
         <div class="alerta alerta-error">
           <?php foreach ($resultado['errores'] as $e) echo htmlspecialchars($e) . '<br>'; ?>
