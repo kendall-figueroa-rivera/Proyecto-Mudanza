@@ -5,10 +5,13 @@
  * Responsable: Kendall Figueroa
  * Descripcion: Controla login, registro, el registro de auditoria de accesos
  *              y la pagina "Mi cuenta" (editar datos y cambiar contrasena).
- *              La recuperacion de contrasena se agrega en la siguiente etapa.
+ *              Las consultas a la base de datos viven en los modelos Usuario,
+ *              Rol y LoginAuditoria (app/models).
  */
 
 require_once __DIR__ . '/../models/Usuario.php';
+require_once __DIR__ . '/../models/Rol.php';
+require_once __DIR__ . '/../models/LoginAuditoria.php';
 
 // Escapa texto para imprimirlo de forma segura dentro del HTML
 if (!function_exists('h')) {
@@ -21,10 +24,16 @@ if (!function_exists('h')) {
 class AuthController
 {
     private PDO $pdo;
+    private Usuario $usuarios;
+    private Rol $roles;
+    private LoginAuditoria $accesos;
 
     public function __construct(PDO $pdo)
     {
-        $this->pdo = $pdo;
+        $this->pdo      = $pdo;
+        $this->usuarios = new Usuario($pdo);
+        $this->roles    = new Rol($pdo);
+        $this->accesos  = new LoginAuditoria($pdo);
     }
 
     /**
@@ -42,50 +51,15 @@ class AuthController
         }
 
         try {
-            $idRol = $this->obtenerIdRol($datos['tipo_cuenta']);
-            $hash = password_hash($datos['password'], PASSWORD_DEFAULT);
+            $idRol = $this->roles->obtenerIdPorNombre($datos['tipo_cuenta']);
+            $hash  = password_hash($datos['password'], PASSWORD_DEFAULT);
 
-            $this->pdo->beginTransaction();
+            // El modelo crea el usuario (sp_registrar_usuario) y, si es empresa, su registro pendiente
+            $idUsuario = $this->usuarios->registrarCuenta($idRol, $datos, $hash);
 
-            // Llama al procedimiento almacenado creado por el modulo de base de datos
-            $stmt = $this->pdo->prepare(
-                "EXEC sp_registrar_usuario
-                    @id_rol = :id_rol,
-                    @nombre = :nombre,
-                    @correo = :correo,
-                    @password_hash = :password_hash,
-                    @telefono = :telefono"
-            );
-            $stmt->execute([
-                ':id_rol'        => $idRol,
-                ':nombre'        => $datos['nombre'],
-                ':correo'        => $datos['correo'],
-                ':password_hash' => $hash,
-                ':telefono'      => $datos['telefono'] !== '' ? $datos['telefono'] : null,
-            ]);
-            $fila = $stmt->fetch(PDO::FETCH_ASSOC);
-            $idUsuario = (int) $fila['id_usuario'];
-
-            if ($datos['tipo_cuenta'] === 'empresa') {
-                // Estado "pendiente": requiere aprobacion del administrador (RF-21)
-                $stmtEmpresa = $this->pdo->prepare(
-                    "INSERT INTO empresas (id_usuario, nombre_comercial, identificacion, estado)
-                     VALUES (:id_usuario, :nombre_comercial, :identificacion, 'pendiente')"
-                );
-                $stmtEmpresa->execute([
-                    ':id_usuario'       => $idUsuario,
-                    ':nombre_comercial' => $datos['nombre_comercial'],
-                    ':identificacion'   => $datos['identificacion'],
-                ]);
-            }
-
-            $this->pdo->commit();
             return ['exito' => true, 'id_usuario' => $idUsuario];
 
         } catch (PDOException $e) {
-            if ($this->pdo->inTransaction()) {
-                $this->pdo->rollBack();
-            }
             return ['exito' => false, 'errores' => [$this->mensajeAmigable($e)]];
         }
     }
@@ -98,20 +72,13 @@ class AuthController
     {
         $ip = $_SERVER['REMOTE_ADDR'] ?? null;
 
-        $stmt = $this->pdo->prepare(
-            "SELECT u.id_usuario, u.nombre, u.password_hash, u.activo, r.nombre AS rol
-             FROM usuarios u
-             INNER JOIN roles r ON r.id_rol = u.id_rol
-             WHERE u.correo = :correo"
-        );
-        $stmt->execute([':correo' => $correo]);
-        $usuario = $stmt->fetch(PDO::FETCH_ASSOC);
+        $usuario = $this->usuarios->buscarParaLogin($correo);
 
         $exitoso = $usuario
             && (bool) $usuario['activo']
             && password_verify($password, $usuario['password_hash']);
 
-        $this->registrarAuditoria($usuario['id_usuario'] ?? null, $correo, $exitoso, $ip);
+        $this->accesos->registrar($usuario['id_usuario'] ?? null, $correo, $exitoso, $ip);
 
         if (!$exitoso) {
             return ['exito' => false, 'errores' => ['Correo o contraseña incorrectos.']];
@@ -182,7 +149,7 @@ class AuthController
     // Retorna los datos del usuario con sesion iniciada (o null si no existe)
     public function obtenerUsuario(int $idUsuario): ?array
     {
-        return (new Usuario($this->pdo))->buscarPorId($idUsuario);
+        return $this->usuarios->buscarPorId($idUsuario);
     }
 
     // Valida y guarda el nombre y el telefono; actualiza el nombre guardado en la sesion
@@ -203,7 +170,7 @@ class AuthController
         }
 
         try {
-            (new Usuario($this->pdo))->actualizarPerfil(
+            $this->usuarios->actualizarPerfil(
                 $idUsuario,
                 $nombre,
                 $telefono !== '' ? $telefono : null
@@ -241,14 +208,13 @@ class AuthController
         }
 
         try {
-            $modelo = new Usuario($this->pdo);
-            $hash   = $modelo->obtenerHash($idUsuario);
+            $hash = $this->usuarios->obtenerHash($idUsuario);
 
             if ($hash === null || !password_verify($actual, $hash)) {
                 return ['exito' => false, 'errores' => ['La contraseña actual no es correcta.']];
             }
 
-            $modelo->actualizarContrasena($idUsuario, password_hash($nueva, PASSWORD_DEFAULT));
+            $this->usuarios->actualizarContrasena($idUsuario, password_hash($nueva, PASSWORD_DEFAULT));
             session_regenerate_id(true);
 
             return ['exito' => true];
@@ -290,43 +256,28 @@ class AuthController
         return $errores;
     }
 
-    private function obtenerIdRol(string $nombreRol): int
-    {
-        $stmt = $this->pdo->prepare("SELECT id_rol FROM roles WHERE nombre = :nombre");
-        $stmt->execute([':nombre' => $nombreRol]);
-        $fila = $stmt->fetch(PDO::FETCH_ASSOC);
-
-        if (!$fila) {
-            throw new RuntimeException("El rol '$nombreRol' no existe en la tabla roles.");
-        }
-
-        return (int) $fila['id_rol'];
-    }
-
-    private function registrarAuditoria(?int $idUsuario, string $correo, bool $exitoso, ?string $ip): void
-    {
-        $stmt = $this->pdo->prepare(
-            "INSERT INTO login_auditoria (id_usuario, correo_intentado, exitoso, ip_origen)
-             VALUES (:id_usuario, :correo, :exitoso, :ip)"
-        );
-        $stmt->execute([
-            ':id_usuario' => $idUsuario,
-            ':correo'     => $correo,
-            ':exitoso'    => $exitoso ? 1 : 0,
-            ':ip'         => $ip,
-        ]);
-    }
-
+    // Traduce los errores de SQL Server a mensajes claros. El numero del error (por ejemplo el 50002
+    // de un THROW) viene en errorInfo[1]; el texto del mensaje NO lo incluye.
     private function mensajeAmigable(PDOException $e): string
     {
-        $msg = $e->getMessage();
+        $codigo = (int) ($e->errorInfo[1] ?? 0);
+        $msg    = $e->getMessage();
 
-        // Traduce los codigos THROW definidos en sp_registrar_usuario
-        if (str_contains($msg, '50002')) {
+        // THROW definidos en sp_registrar_usuario (con respaldo por el texto, por si el driver no llena errorInfo)
+        if ($codigo === 50002 || str_contains($msg, 'El correo ya está registrado')) {
             return 'El correo ya se encuentra registrado.';
         }
-        if (str_contains($msg, '50001')) {
+        if ($codigo === 50001 || str_contains($msg, 'El rol indicado no existe')) {
             return 'El rol indicado no existe.';
+        }
+
+        // Llave unica repetida (2627 o 2601): la cedula juridica ya existe, o dos personas se registraron a la vez
+        if ($codigo === 2627 || $codigo === 2601) {
+            if (str_contains($msg, 'empresas')) {
+                return 'La identificación (cédula jurídica) ya está registrada.';
+            }
+
+            return 'El correo ya se encuentra registrado.';
         }
 
         return 'Ocurrió un error al procesar la solicitud. Intenta de nuevo.';
