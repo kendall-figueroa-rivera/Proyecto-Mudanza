@@ -2,7 +2,8 @@
  * Archivo: validaciones.js
  * Modulo: Frontend - Autenticacion
  * Responsable: Kendall Figueroa
- * Descripcion: Validaciones de los formularios de login y registro (lado cliente).
+ * Descripcion: Validaciones de los formularios de login, registro y recuperacion de
+ *              contrasena (lado cliente).
  *              La validacion definitiva siempre ocurre tambien en el servidor
  *              (AuthController.php), esto solo da feedback inmediato al usuario.
  */
@@ -61,6 +62,38 @@ $(function () {
             $correo.addClass('is-invalid');
             valido = false;
         }
+        if ($password.val().length < 8) {
+            $password.addClass('is-invalid');
+            valido = false;
+        }
+        if ($password.val() !== $confirm.val()) {
+            $confirm.addClass('is-invalid');
+            valido = false;
+        }
+        if (!valido) e.preventDefault();
+    });
+
+    // Valida el formulario donde se pide el enlace de recuperacion de contrasena
+    $('#formRecuperar').on('submit', function (e) {
+        const $correo = $('#correo');
+
+        $correo.removeClass('is-invalid');
+
+        if (!correoValido($correo.val())) {
+            $correo.addClass('is-invalid');
+            e.preventDefault();
+        }
+    });
+
+    // Valida el formulario donde se crea la contrasena nueva con el enlace del correo
+    $('#formRestablecer').on('submit', function (e) {
+        let valido = true;
+        const $password = $('#password');
+        const $confirm = $('#password_confirm');
+
+        $password.removeClass('is-invalid');
+        $confirm.removeClass('is-invalid');
+
         if ($password.val().length < 8) {
             $password.addClass('is-invalid');
             valido = false;

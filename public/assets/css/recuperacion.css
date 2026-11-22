@@ -1,0 +1,13 @@
+/*
+ * Archivo: recuperacion.css
+ * Modulo: Frontend
+ * Responsable: Kendall Figueroa
+ * Descripcion: Estilos extra de las paginas de recuperacion de contrasena. Se usa
+ *              junto con login.css (misma identidad visual).
+ * Estandar: el CSS va siempre en archivos externos, nunca dentro de la pagina.
+ */
+
+.alerta-aviso{ background:#FBF1DD; color:#7A5A12; border:1px solid #E8D3A1; }
+.alerta-aviso strong{ display:block; margin-bottom:6px; }
+.enlace-local{ display:block; word-break:break-all; font-size:.82rem; margin-top:6px; }
+.card .nota{ color:var(--muted); font-size:.85rem; margin:14px 0 0; }
