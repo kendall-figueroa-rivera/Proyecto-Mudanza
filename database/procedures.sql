@@ -298,3 +298,225 @@ BEGIN
     END CATCH
 END
 GO
+
+
+-- Pasa una solicitud aceptada a completada y notifica al cliente
+CREATE OR ALTER PROCEDURE sp_completar_solicitud
+    @id_solicitud INT,
+    @id_empresa   INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+
+    DECLARE @id_cliente INT,
+            @estado     VARCHAR(15);
+
+    SELECT @id_cliente = s.id_cliente,
+           @estado     = s.estado
+    FROM solicitudes s
+    INNER JOIN proformas p ON p.id_proforma = s.id_proforma
+    WHERE s.id_solicitud = @id_solicitud
+      AND p.id_empresa = @id_empresa;
+
+    IF @id_cliente IS NULL
+    BEGIN
+        THROW 50032, N'La solicitud no existe o no pertenece a la empresa.', 1;
+    END
+
+    IF @estado <> 'aceptada'
+    BEGIN
+        THROW 50033, N'Solo se puede completar una solicitud que esté aceptada.', 1;
+    END
+
+    BEGIN TRY
+        BEGIN TRANSACTION;
+
+        UPDATE solicitudes
+        SET estado = 'completada'
+        WHERE id_solicitud = @id_solicitud;
+
+        INSERT INTO notificaciones (id_usuario, mensaje)
+        VALUES (@id_cliente,
+                CONCAT(N'Tu solicitud #', @id_solicitud, N' fue completada. Ya puedes calificarla.'));
+
+        COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        THROW;
+    END CATCH
+END
+GO
+
+
+-- Activa o desactiva un usuario solo lo puede hacer un administrador activo
+CREATE OR ALTER PROCEDURE sp_cambiar_estado_usuario
+    @id_usuario INT,
+    @id_admin   INT,
+    @activo     BIT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    IF NOT EXISTS (SELECT 1 FROM usuarios u
+                   INNER JOIN roles r ON r.id_rol = u.id_rol
+                   WHERE u.id_usuario = @id_admin
+                     AND r.nombre = 'administrador' AND u.activo = 1)
+    BEGIN
+        THROW 50060, N'Solo un administrador activo puede cambiar el estado de un usuario.', 1;
+    END
+
+    IF @id_usuario = @id_admin
+    BEGIN
+        THROW 50061, N'Un administrador no puede desactivar su propia cuenta.', 1;
+    END
+
+    IF NOT EXISTS (SELECT 1 FROM usuarios WHERE id_usuario = @id_usuario)
+    BEGIN
+        THROW 50062, N'El usuario no existe.', 1;
+    END
+
+    UPDATE usuarios
+    SET activo = @activo
+    WHERE id_usuario = @id_usuario;
+END
+GO
+
+
+-- Oculta o muestra una reseña solo lo puede hacer un administrador activo
+CREATE OR ALTER PROCEDURE sp_moderar_resena
+    @id_resena INT,
+    @id_admin  INT,
+    @estado    VARCHAR(10)          -- 'visible' u 'oculta'
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    IF @estado NOT IN ('visible', 'oculta')
+    BEGIN
+        THROW 50063, N'El estado debe ser visible u oculta.', 1;
+    END
+
+    IF NOT EXISTS (SELECT 1 FROM usuarios u
+                   INNER JOIN roles r ON r.id_rol = u.id_rol
+                   WHERE u.id_usuario = @id_admin
+                     AND r.nombre = 'administrador' AND u.activo = 1)
+    BEGIN
+        THROW 50064, N'Solo un administrador activo puede moderar reseñas.', 1;
+    END
+
+    IF NOT EXISTS (SELECT 1 FROM resenas WHERE id_resena = @id_resena)
+    BEGIN
+        THROW 50065, N'La reseña no existe.', 1;
+    END
+
+    UPDATE resenas
+    SET estado = @estado
+    WHERE id_resena = @id_resena;
+END
+GO
+
+
+-- Guarda un token de recuperacion si el correo existe y devuelve nombre y correo
+-- Si el correo no existe no devuelve filas ni error (no revela correos registrados)
+CREATE OR ALTER PROCEDURE sp_crear_token_recuperacion
+    @correo  VARCHAR(150),
+    @token   VARCHAR(255),
+    @minutos INT = 30
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+
+    DECLARE @id_usuario INT,
+            @nombre     VARCHAR(100);
+
+    SELECT @id_usuario = id_usuario,
+           @nombre     = nombre
+    FROM usuarios
+    WHERE correo = @correo AND activo = 1;
+
+    IF @id_usuario IS NULL
+    BEGIN
+        RETURN;
+    END
+
+    BEGIN TRY
+        BEGIN TRANSACTION;
+
+        -- Invalida los enlaces anteriores sin usar de ese usuario
+        UPDATE token_recuperacion
+        SET usado = 1
+        WHERE id_usuario = @id_usuario AND usado = 0;
+
+        INSERT INTO token_recuperacion (id_usuario, token, fecha_expiracion)
+        VALUES (@id_usuario, @token, DATEADD(MINUTE, @minutos, GETDATE()));
+
+        COMMIT TRANSACTION;
+
+        SELECT @nombre AS nombre, @correo AS correo;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        THROW;
+    END CATCH
+END
+GO
+
+
+-- Cambia la contraseña con un token valido y marca el token como usado
+CREATE OR ALTER PROCEDURE sp_restablecer_contrasena
+    @token         VARCHAR(255),
+    @password_hash VARCHAR(255)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+
+    DECLARE @id_token   INT,
+            @id_usuario INT,
+            @expira     DATETIME,
+            @usado      BIT;
+
+    SELECT @id_token   = id_token,
+           @id_usuario = id_usuario,
+           @expira     = fecha_expiracion,
+           @usado      = usado
+    FROM token_recuperacion
+    WHERE token = @token;
+
+    IF @id_token IS NULL
+    BEGIN
+        THROW 50070, N'El enlace de recuperación no es válido.', 1;
+    END
+
+    IF @usado = 1
+    BEGIN
+        THROW 50071, N'El enlace de recuperación ya fue utilizado.', 1;
+    END
+
+    IF @expira < GETDATE()
+    BEGIN
+        THROW 50072, N'El enlace de recuperación venció.', 1;
+    END
+
+    BEGIN TRY
+        BEGIN TRANSACTION;
+
+        UPDATE usuarios
+        SET password_hash = @password_hash
+        WHERE id_usuario = @id_usuario;
+
+        UPDATE token_recuperacion
+        SET usado = 1
+        WHERE id_token = @id_token;
+
+        COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        THROW;
+    END CATCH
+END
+GO
