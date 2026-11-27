@@ -1,6 +1,6 @@
 -- Archivo: schema.sql
 -- Modulo: Base de datos
--- Responsable: Daniel Gómez Mora
+-- Responsable: Daniel Gómez Mora 
 -- Descripcion: Estructura de tablas segun el diagrama ER
 --              del anteproyecto (12 entidades + Empresa_Zona).
 
